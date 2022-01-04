@@ -1,0 +1,10 @@
+spotify:
+  client_id: your_client_id
+  client_secret: your_client_secret
+  username: your_spotify_username
+  redirect_uri: http://localhost:8888/callback
+
+# add Spotify playlist IDs here (one per line preceded by -)
+sync_playlists:
+  # Example:
+  - 2237sMNMlXS4wWLgdQ1UuV

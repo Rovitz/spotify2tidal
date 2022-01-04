@@ -1,0 +1,6 @@
+.idea
+.cache*
+.session*
+venv
+__pycache__
+config.yml
