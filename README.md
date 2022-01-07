@@ -5,7 +5,7 @@ Installation
 Clone this git repository and then run:
 
 ```bash
-python -m pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
 Setup
@@ -23,7 +23,7 @@ Usage
 To sync Spotify playlists with your Tidal account run the following
 
 ```bash
-python sync.py
+python3 sync.py
 ```
 
 Enjoy!

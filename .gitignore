@@ -1,6 +1,7 @@
 .idea
 .cache*
 .session*
+log*
 venv
 __pycache__
 config.yml

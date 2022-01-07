@@ -17,15 +17,26 @@ from auth import open_tidal_session, open_spotify_session
 
 
 def simplify(input_string):
-    result = unidecode(input_string).lower().replace(' x ', ' ').replace(' - ', ' ').replace(' vs ', ' ')
-    if len(input_string) > 50:
-        result = result.split('(')[0].strip().split('[')[0].strip()
-    return re.sub(r'[^a-z0-9$!&?.\'\- ]', '',
-                  re.sub('[(]?(ft.|feat.|[(]with|original mix|extended mix|radio edit|mixed).*', '', result))
+    replacements = {
+        ' x ': ' ',
+        ' vs ': ' ',
+        ' - ': ' '
+    }
+    regex = {
+        '(original mix|extended mix|radio edit|mixed|remastered|version)': '',
+        '[(]?(ft.|feat.|prod.|[(]with).*\\)|(ft.|feat.|prod.).*': '',
+        r'[^a-z0-9$!&?.\'\- ]': ''
+    }
+    result = unidecode(input_string).lower()
+    for k, v in replacements.items():
+        result = result.replace(k, v)
+    for k, v in regex.items():
+        result = re.compile(k).sub(v, result)
+    return result
 
 
 def name_match(tidal_track, spotify_track):
-    return fuzz.token_set_ratio(simplify(tidal_track.name), simplify(spotify_track['name']))
+    return fuzz.partial_ratio(simplify(tidal_track.name), simplify(spotify_track['name'])) >= 90
 
 
 def artist_match(tidal_track, spotify_track):
@@ -41,24 +52,30 @@ def artist_match(tidal_track, spotify_track):
             result += artist['name'] + ' '
         return simplify(result)
 
-    return fuzz.token_set_ratio(get_tidal_artists(tidal_track), get_spotify_artists(spotify_track))
+    return fuzz.token_set_ratio(get_tidal_artists(tidal_track), get_spotify_artists(spotify_track)) >= 80
 
 
 def duration_match(tidal_track, spotify_track, tolerance=2):
     return abs(tidal_track.duration - spotify_track['duration_ms'] / 1000) < tolerance
 
 
+def album_match(tidal_track, spotify_track):
+    return fuzz.ratio(simplify(tidal_track.album.name), simplify(spotify_track['album']['name'])) >= 90
+
+
 def match(tidal_track, spotify_track):
-    name_match_ratio = name_match(tidal_track, spotify_track)
-    artist_match_ratio = artist_match(tidal_track, spotify_track)
-    return (name_match_ratio > 80 & artist_match_ratio > 80 & duration_match(tidal_track, spotify_track)) | \
-           (name_match_ratio > 95 & artist_match_ratio > 95)
+    name_matching = name_match(tidal_track, spotify_track)
+    artist_matching = artist_match(tidal_track, spotify_track)
+    duration_matching = duration_match(tidal_track, spotify_track)
+    album_matching = album_match(tidal_track, spotify_track)
+
+    return [name_matching, artist_matching, duration_matching, album_matching].count(True) >= 3
 
 
 def tidal_search(spotify_track, tidal_session):
-    query = simplify(spotify_track['artists'][0]['name']) + ' ' + simplify(spotify_track['name'])
-    if len(query) > 40:
-        query = simplify(spotify_track['name'])
+    query = simplify(spotify_track['name'])
+    if len(query) <= 25:
+        query = simplify(spotify_track['artists'][0]['name']) + ' ' + simplify(spotify_track['name'])
     for track in tidal_session.search(query)['tracks']:
         if match(track, spotify_track):
             return track
@@ -82,7 +99,7 @@ def call_async(spotify_tracks, **kwargs):
 def get_tracks_from_spotify_playlist(spotify_session, spotify_playlist):
     output = []
     results = spotify_session.playlist_tracks(spotify_playlist['id'],
-                                              fields="next,items(track(name,artists(name),duration_ms))")
+                                              fields="next,items(track(name,artists(name),duration_ms,album(name)))")
     while True:
         output.extend([r['track'] for r in results['items'] if r['track'] is not None])
         if results['next']:
